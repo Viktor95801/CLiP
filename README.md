@@ -1,4 +1,4 @@
-# CliP - A simple Command Line Parser in C
+# CLiP - A simple Command Line Parser in C
 
 Reimplementation of my old https://github.com/Viktor95801/ccli-parse/
 
