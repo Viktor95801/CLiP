@@ -64,7 +64,6 @@ typedef struct {
 typedef struct clip_Ctx {
     int _argc;
     char **_argv;
-    int _argi;
 
     void (*usage_fn)(struct clip_Ctx *ctx);
     int _optc;
@@ -148,6 +147,28 @@ inline clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until) {
     return clip_Ctx_parseUntilMany(ctx, 1, &until);
 }
 
+#define CLIP__parseArg(arg) do {                                                                   \
+    switch(opt->type) {                                                                            \
+    case vtyp_FLAG: break;                                                                         \
+    case vtyp_STRING:                                                                              \
+        opt->_handler->as.string = (arg);                                                          \
+        break;                                                                                     \
+    case vtyp_INT:                                                                                 \
+        if(sscanf((arg), "%d", &opt->_handler->as.integer) != 1) {                                 \
+            clip_Result res = {0};                                                                 \
+            snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires an integer value", opt->name); \
+            return res;                                                                            \
+        }                                                                                          \
+        break;                                                                                     \
+    case vtyp_FLOAT:                                                                               \
+        if(sscanf((arg), "%f", &opt->_handler->as.floating) != 1) {                                \
+            clip_Result res = {0};                                                                 \
+            snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a float value", opt->name);    \
+            return res;                                                                            \
+        }                                                                                          \
+        break;                                                                                     \
+    }                                                                                              \
+} while(0)
 clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
     int i = 0;
     for(char *arg = ctx->_argv[i]; i < ctx->_argc; ++i, arg = ctx->_argv[i]) {
@@ -157,102 +178,77 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             }
         }
 
-        if(arg[0] != '-') {
+        if(*arg != '-') {
             ctx->_program_argv[ctx->_program_argc++] = arg;
             continue;
         }
+        ++arg;
 
-        if(arg[1] != '-') {
+        if(*arg != '-') {
             clip_Option *opt = NULL;
             for(int j = 0; j < ctx->_optc; ++j) {
-                if(ctx->_optv[j].short_name == arg[1]) {
+                if(ctx->_optv[j].short_name == *arg) {
                     opt = &ctx->_optv[j];
                     break;
                 }
             }
             if(opt == NULL) {
                 clip_Result res = {0};
-                snprintf(res.err, CLIP_ERROR_LEN, "unknown short option: %s", arg);
+                snprintf(res.err, CLIP_ERROR_LEN, "unknown short option: %s", ctx->_argv[i]);
                 return res;
             }
 
             if(opt->type == vtyp_FLAG) {
-                if(strlen(arg) > 2) {
+                if(strlen(arg) != 1) {
                     clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, arg);
+                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, ctx->_argv[i]);
                     return res;
                 }
                 opt->_handler->as.flag = true;
                 continue;
             }
 
-            if(arg[2] != '=' && arg[2] != ':') {
+            if(arg[1] != '=' && arg[1] != ':') {
                 clip_Result res = {0};
                 snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value", opt->name);
                 return res;
             }
-            switch(opt->type) {
-            case vtyp_FLAG: break;
-            case vtyp_STRING:
-                opt->_handler->as.string = arg + 3;
-                break;
-            case vtyp_INT:
-                if(sscanf(arg + 3, "%d", &opt->_handler->as.integer) != 1) {
-                    clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires an integer value", opt->name);
-                    return res;
-                }
-                break;
-            case vtyp_FLOAT:
-                if(sscanf(arg + 3, "%f", &opt->_handler->as.floating) != 1) {
-                    clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a float value", opt->name);
-                    return res;
-                }
-                break;
-            }
+            CLIP__parseArg(arg + 2);
             continue;
         }
+        ++arg;
 
         size_t arg_len = 0;
         char *arg_assign = NULL;
-        if((arg_assign = strchr(arg + 2, '=')) != NULL || (arg_assign = strchr(arg + 2, ':')) != NULL) {
+        if((arg_assign = strchr(arg, '=')) != NULL || (arg_assign = strchr(arg, ':')) != NULL) {
             arg_len = arg_assign - arg;
         } else {
             arg_len = strlen(arg);
         }
 
-        struct {
-            char *name;
-            size_t len;
-        } arg_info = {
-            .name = arg + 2,
-            .len = arg_len - 2,
-        };
-
-        if(arg_info.len <= 0) {
+        if(arg_len <= 0) {
             clip_Result res = {0};
-            snprintf(res.err, CLIP_ERROR_LEN, "missing name for long option '%s'", arg);
+            snprintf(res.err, CLIP_ERROR_LEN, "missing name for long option '%s'", ctx->_argv[i]);
             return res;
         }
 
         clip_Option *opt = NULL;
         for(int j = 0; j < ctx->_optc; ++j) {
-            if(strlen(ctx->_optv[j].name) == arg_info.len && strncmp(arg_info.name, ctx->_optv[j].name, arg_info.len) == 0) {
+            if(strlen(ctx->_optv[j].name) == arg_len && strncmp(arg, ctx->_optv[j].name, arg_len) == 0) {
                 opt = &ctx->_optv[j];
                 break;
             }
         }
         if(opt == NULL) {
             clip_Result res = {0};
-            snprintf(res.err, CLIP_ERROR_LEN, "unknown long option '%s'", arg);
+            snprintf(res.err, CLIP_ERROR_LEN, "unknown long option '%s'", ctx->_argv[i]);
             return res;
         }
 
         if(opt->type == vtyp_FLAG) {
             if(strlen(arg) > arg_len + 2) {
                 clip_Result res = {0};
-                snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, arg);
+                snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, ctx->_argv[i]);
                 return res;
             }
             opt->_handler->as.flag = true;
@@ -264,27 +260,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value", opt->name);
             return res;
         }
-        switch(opt->type) {
-            case vtyp_STRING:
-                opt->_handler->as.string = arg_assign+1;
-                break;
-            case vtyp_FLOAT:
-                if(sscanf(arg_assign + 1, "%f", &opt->_handler->as.floating) != 1) {
-                    clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a float value", opt->name);
-                    return res;
-                }
-                break;
-            case vtyp_INT:
-                if(sscanf(arg_assign + 1, "%d", &opt->_handler->as.integer) != 1) {
-                    clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires an integer value", opt->name);
-                    return res;
-                }
-                break;
-            case vtyp_FLAG:
-                break;
-        }
+        CLIP__parseArg(arg_assign+1);
     }
 
 clip_Ctx_parseUntilMany_DONE:
@@ -296,6 +272,7 @@ clip_Ctx_parseUntilMany_DONE:
         .program_argv = (char**)ctx->_program_argv,
     };
 }
+#undef CLIP__parseArg
 
 #endif // CLIP_IMPLEMENTATION
 
