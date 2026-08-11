@@ -14,6 +14,10 @@ extern "C" {
 
 #define CLIP_assert(cond, msg) assert(cond && msg)
 
+#define CLIP__STRINGIFICATE_(x) CLIP__STRINGIFICATE(x)
+#define CLIP__STRINGIFICATE(x) #x
+#define CLIP__LINE CLIP__STRINGIFICATE(__LINE__)
+
 #ifndef CLIP_ERROR_LEN
 #define CLIP_ERROR_LEN 512
 #endif
@@ -88,7 +92,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]);
 }
 #endif
 
-//#define CLIP_IMPLEMENTATION
+#define CLIP_IMPLEMENTATION
 #ifdef CLIP_IMPLEMENTATION
 
 void clip__default_Ctx_usage(struct clip_Ctx *ctx) {
@@ -149,7 +153,7 @@ inline clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until) {
 
 #define CLIP__parseArg(arg) do {                                                                   \
     switch(opt->type) {                                                                            \
-    case vtyp_FLAG: break;                                                                         \
+    case vtyp_FLAG: CLIP_assert(0, ("UNREACHABLE: " __FILE__ ":" CLIP__LINE));                     \
     case vtyp_STRING:                                                                              \
         opt->_handler->as.string = (arg);                                                          \
         break;                                                                                     \
@@ -208,12 +212,18 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
                 continue;
             }
 
-            if(arg[1] != '=' && arg[1] != ':') {
+            char *arg_value = arg + 1;
+            if(strlen(arg) <= 1 && ctx->_argc > i + 1) {
+                arg_value = ctx->_argv[i + 1];
+                ++i;
+            } else if(strlen(arg) > 1 && (arg[1] == '=' || arg[1] == ':')) {
+                ++arg_value;
+            } else if(strlen(arg) <= 1) {
                 clip_Result res = {0};
-                snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value", opt->name);
+                snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value: %s", opt->name, ctx->_argv[i]);
                 return res;
             }
-            CLIP__parseArg(arg + 2);
+            CLIP__parseArg(arg_value);
             continue;
         }
         ++arg;
@@ -246,7 +256,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
         }
 
         if(opt->type == vtyp_FLAG) {
-            if(strlen(arg) > arg_len + 2) {
+            if(strlen(arg) > arg_len) {
                 clip_Result res = {0};
                 snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, ctx->_argv[i]);
                 return res;
@@ -255,12 +265,15 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             continue;
         }
 
-        if(arg_assign == NULL) {
+        char *arg_value = arg_assign + 1;
+        if(arg_assign == NULL && ctx->_argc > i + 1) {
+            arg_value = ctx->_argv[++i];
+        } else if(arg_assign == NULL) {
             clip_Result res = {0};
-            snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value", opt->name);
+            snprintf(res.err, CLIP_ERROR_LEN, "option '%s' requires a value: %s", opt->name, ctx->_argv[i]);
             return res;
         }
-        CLIP__parseArg(arg_assign+1);
+        CLIP__parseArg(arg_value);
     }
 
 clip_Ctx_parseUntilMany_DONE:
