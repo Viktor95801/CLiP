@@ -12,6 +12,8 @@
 extern "C" {
 #endif
 
+#define CLIP_assert(cond, msg) assert(cond && msg)
+
 #ifndef CLIP_ERROR_LEN
 #define CLIP_ERROR_LEN 512
 #endif
@@ -46,9 +48,8 @@ typedef struct {
     const char *name;
     char short_name;
     const char *desc;
-    const char *short_desc;
 
-    clip_Value *_handler;
+    clip_Value *_handler; // internal variable for handling the option's value
 } clip_Option;
 
 typedef struct {
@@ -95,8 +96,8 @@ void clip__default_Ctx_usage(struct clip_Ctx *ctx) {
     int maxlen = 0;
     for (int i = 0; i < ctx->_optc; ++i) {
         int len = strlen(ctx->_optv[i].name) + 2;
-        if (ctx->_optv[i].short_name != '\0') {
-            len += 3; // for ", X"
+        if (ctx->_optv[i].short_name != 0) {
+            len += 4; // for ", -X"
         }
         if (len > maxlen) maxlen = len;
     }
@@ -104,19 +105,14 @@ void clip__default_Ctx_usage(struct clip_Ctx *ctx) {
     for(int i = 0; i < ctx->_optc; ++i) {
         clip_Option opt = ctx->_optv[i];
         fprintf(stderr, "  --%s", opt.name);
-        if(opt.short_name != '\0') {
+        int already_printed = strlen(opt.name) + 2;
+        if(opt.short_name != 0) {
             fprintf(stderr, ", -%c", opt.short_name);
+            already_printed += 4; // for ", -X"
         }
-        int printed_len = (opt.short_name != '\0')
-            ? (int)strlen(opt.name) + 5  // "name, x"
-            : (int)strlen(opt.name) + 2;
-        int padding = maxlen - printed_len;
+        int padding = maxlen - already_printed;
         fprintf(stderr, "%-*s", padding, "\0");
-        if(opt.short_desc != NULL) {
-            fprintf(stderr, " : %s\n", opt.short_desc);
-        } else {
-            fprintf(stderr, " : %s\n", opt.desc);
-        }
+        fprintf(stderr, " : %s\n", opt.desc);
     }
 }
 
@@ -133,7 +129,8 @@ bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct
 }
 
 void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt) {
-    assert(ctx->_optc + 1 <= CLIP_MAX_OPTIONS);
+    CLIP_assert(ctx->_optc + 1 <= CLIP_MAX_OPTIONS, "CLIP_MAX_OPTIONS is too small");
+    CLIP_assert(opt.name != NULL && strlen(opt.name) > 0, "option name is empty");
     ctx->_optv[ctx->_optc] = opt;
     ctx->_values[ctx->_optc] = (clip_Value){
         .type = opt.type,
@@ -143,11 +140,11 @@ void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt) {
     return &ctx->_values[ctx->_optc++].as;
 }
 
-clip_Result clip_Ctx_parse(clip_Ctx *ctx) {
+inline clip_Result clip_Ctx_parse(clip_Ctx *ctx) {
     return clip_Ctx_parseUntil(ctx, "--");
 }
 
-clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until) {
+inline clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until) {
     return clip_Ctx_parseUntilMany(ctx, 1, &until);
 }
 
@@ -217,7 +214,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             continue;
         }
 
-        int arg_len = 0;
+        size_t arg_len = 0;
         char *arg_assign = NULL;
         if((arg_assign = strchr(arg + 2, '=')) != NULL || (arg_assign = strchr(arg + 2, ':')) != NULL) {
             arg_len = arg_assign - arg;
@@ -227,7 +224,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
 
         struct {
             char *name;
-            int len;
+            size_t len;
         } arg_info = {
             .name = arg + 2,
             .len = arg_len - 2,

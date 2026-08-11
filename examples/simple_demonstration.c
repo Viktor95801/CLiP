@@ -10,39 +10,39 @@ int main(int argc, char **argv) {
     clip_Ctx ctx = {0};
     clip_Ctx_init(&ctx, argc, argv, my_usage);
     char **name = clip_Ctx_option(&ctx, (clip_Option){
-        vtyp_STRING,
-        "name",
-        'n',
-        "Your name, used for greeting.",
+        .type = vtyp_STRING,
+        .name = "name",
+        .short_name = 'n',
+        .desc = "Your name, used for greeting.",
     });
     bool *goodbye = clip_Ctx_option(&ctx, (clip_Option){
-        vtyp_FLAG,
-        "goodbye",
-        'g',
-        "Whether to say goodbye.",
+        .type = vtyp_FLAG,
+        .name = "goodbye",
+        .short_name = 'g',
+        .desc = "Whether to say goodbye.",
     });
     int *age = clip_Ctx_option(&ctx, (clip_Option){
-        vtyp_INT,
-        "age",
-        'a',
-        "Your age.",
+        .type = vtyp_INT,
+        .name = "age",
+        .short_name = 'a',
+        .desc = "Your age.",
     });
     float *height = clip_Ctx_option(&ctx, (clip_Option){
-        vtyp_FLOAT,
-        "height",
-        'h',
-        "Your height in cm.",
+        .type = vtyp_FLOAT,
+        .name = "height",
+        .short_name = 'h',
+        .desc = "Your height in cm.",
     });
-
-    if (argc == 1) {
-        ctx.usage_fn(&ctx);
-        return 0;
-    }
 
     clip_Result result = clip_Ctx_parse(&ctx);
     if(strlen(result.err) > 0) {
         fprintf(stderr, "ERROR: %s\n", result.err);
         return 1;
+    }
+
+    if (argc == 1) {
+        ctx.usage_fn(&ctx);
+        return 0;
     }
 
     if(*name) {
