@@ -92,7 +92,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]);
 }
 #endif
 
-#define CLIP_IMPLEMENTATION
+//#define CLIP_IMPLEMENTATION
 #ifdef CLIP_IMPLEMENTATION
 
 void clip__default_Ctx_usage(struct clip_Ctx *ctx) {
@@ -265,8 +265,10 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             continue;
         }
 
-        char *arg_value = arg_assign + 1;
-        if(arg_assign == NULL && ctx->_argc > i + 1) {
+        char *arg_value = NULL;
+        if(arg_assign != NULL) {
+            arg_value = arg_assign + 1;
+        } else if(arg_assign == NULL && ctx->_argc > i + 1) {
             arg_value = ctx->_argv[++i];
         } else if(arg_assign == NULL) {
             clip_Result res = {0};
