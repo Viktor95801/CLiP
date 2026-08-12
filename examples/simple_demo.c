@@ -3,7 +3,7 @@
 
 void my_usage(struct clip_Ctx *ctx) {
     fprintf(stderr, "Usage: %s [options]\n", ctx->_program_argv[0]);
-    clip__default_Ctx_usage(ctx);
+    clip_default_Ctx_usage(ctx);
 }
 
 int main(int argc, char **argv) {

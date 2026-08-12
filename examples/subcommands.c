@@ -22,14 +22,14 @@ int handle_clone(bool usage, int argc, char **argv) {
 
     if(usage) {
         fprintf(stderr, "Usage: app [--verbose] clone [options] <repository>\n");
-        ctx.usage_fn(&ctx);
+        clip__Ctx_print_options(&ctx);
         return 0;
     }
 
     clip_Result res = clip_Ctx_parse(&ctx);
     if (res.err[0] != '\0') {
         fprintf(stderr, "Error [clone]: %s\n", res.err);
-        ctx.usage_fn(&ctx);
+        clip_default_Ctx_usage(&ctx);
         return 1;
     }
 
@@ -68,7 +68,7 @@ int handle_commit(bool usage, int argc, char **argv) {
 
     if(usage) {
         fprintf(stderr, "Usage: app [--verbose] commit [options]\n");
-        ctx.usage_fn(&ctx);
+        clip__Ctx_print_options(&ctx);
         return 0;
     }
 

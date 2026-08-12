@@ -76,7 +76,10 @@ typedef struct clip_Ctx {
     int _program_argc;
     const char *_program_argv[CLIP_MAX_PROGRAM_ARGS];
 } clip_Ctx;
-void clip__default_Ctx_usage(clip_Ctx *ctx);
+
+const char *clip__type_hint(clip_Value_Type type);
+void clip__Ctx_print_options(clip_Ctx *ctx);
+void clip_default_Ctx_usage(clip_Ctx *ctx);
 
 bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx));
 void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt);
@@ -92,31 +95,58 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]);
 }
 #endif
 
-//#define CLIP_IMPLEMENTATION
+#define CLIP_IMPLEMENTATION
 #ifdef CLIP_IMPLEMENTATION
 
-void clip__default_Ctx_usage(struct clip_Ctx *ctx) {
-    int maxlen = 0;
+const char *clip__type_hint(clip_Value_Type type) {
+    switch (type) {
+    case vtyp_INT:    return " <INT>";
+    case vtyp_FLOAT:  return " <FLOAT>";
+    case vtyp_STRING: return " <STR>";
+    case vtyp_FLAG:   return "";
+    }
+    return "";
+}
+
+void clip__Ctx_print_options(clip_Ctx *ctx) {
+    int max_len = 0;
     for (int i = 0; i < ctx->_optc; ++i) {
-        int len = strlen(ctx->_optv[i].name) + 2;
-        if (ctx->_optv[i].short_name != 0) {
-            len += 4; // for ", -X"
+        clip_Option opt = ctx->_optv[i];
+        int len = 4; // base indent "  --"
+        len += strlen(opt.name);
+
+        if (opt.short_name != 0) {
+            len += 4; // ", -X"
         }
-        if (len > maxlen) maxlen = len;
+
+        len += strlen(clip__type_hint(opt.type));
+
+        if (len > max_len) {
+            max_len = len;
+        }
     }
 
-    for(int i = 0; i < ctx->_optc; ++i) {
+    for (int i = 0; i < ctx->_optc; ++i) {
         clip_Option opt = ctx->_optv[i];
-        fprintf(stderr, "  --%s", opt.name);
-        int already_printed = strlen(opt.name) + 2;
-        if(opt.short_name != 0) {
-            fprintf(stderr, ", -%c", opt.short_name);
-            already_printed += 4; // for ", -X"
+        char left_buf[256];
+
+        if (opt.short_name != 0) {
+            snprintf(left_buf, sizeof(left_buf), "  --%s, -%c%s",
+                     opt.name, opt.short_name, clip__type_hint(opt.type));
+        } else {
+            snprintf(left_buf, sizeof(left_buf), "  --%s%s",
+                     opt.name, clip__type_hint(opt.type));
         }
-        int padding = maxlen - already_printed;
-        fprintf(stderr, "%-*s", padding, "\0");
-        fprintf(stderr, " : %s\n", opt.desc);
+
+        fprintf(stderr, "%-*s  %s\n", max_len, left_buf, opt.desc ? opt.desc : "");
     }
+}
+
+void clip_default_Ctx_usage(clip_Ctx *ctx) {
+    const char *prog_name = (ctx->_argc > 0 && ctx->_argv[0]) ? ctx->_argv[0] : "program";
+    fprintf(stderr, "Usage: %s [OPTIONS]\n\n", prog_name);
+    fprintf(stderr, "Options:\n");
+    clip__Ctx_print_options(ctx);
 }
 
 bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx)) {
@@ -124,7 +154,7 @@ bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct
     ctx->_argc = argc;
     ctx->_argv = argv;
     if(usage_fn == NULL) {
-        ctx->usage_fn = clip__default_Ctx_usage;
+        ctx->usage_fn = clip_default_Ctx_usage;
     } else {
         ctx->usage_fn = usage_fn;
     }
