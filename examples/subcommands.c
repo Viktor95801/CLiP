@@ -2,7 +2,7 @@
 #include "../clip.h"
 
 // Subcommand: clone
-int handle_clone(int argc, char **argv) {
+int handle_clone(bool usage, int argc, char **argv) {
     clip_Ctx ctx;
     clip_Ctx_init(&ctx, argc, argv, NULL);
 
@@ -19,6 +19,12 @@ int handle_clone(int argc, char **argv) {
         .short_name = 'b',
         .desc = "Point HEAD to the specified branch instead of default",
     });
+
+    if(usage) {
+        fprintf(stderr, "Usage: app [--verbose] clone [options] <repository>\n");
+        ctx.usage_fn(&ctx);
+        return 0;
+    }
 
     clip_Result res = clip_Ctx_parse(&ctx);
     if (res.err[0] != '\0') {
@@ -42,7 +48,7 @@ int handle_clone(int argc, char **argv) {
 }
 
 // Subcommand: commit
-int handle_commit(int argc, char **argv) {
+int handle_commit(bool usage, int argc, char **argv) {
     clip_Ctx ctx;
     clip_Ctx_init(&ctx, argc, argv, NULL);
 
@@ -59,6 +65,12 @@ int handle_commit(int argc, char **argv) {
         .short_name = 'a',
         .desc = "Stage all modified files automatically",
     });
+
+    if(usage) {
+        fprintf(stderr, "Usage: app [--verbose] commit [options]\n");
+        ctx.usage_fn(&ctx);
+        return 0;
+    }
 
     clip_Result res = clip_Ctx_parse(&ctx);
     if (res.err[0] != '\0') {
@@ -107,18 +119,27 @@ int main(int argc, char **argv) {
     // If no subcommand was reached
     if (res.unparsed_argc == 0) {
         fprintf(stderr, "Usage: app [--verbose] <subcommand> [options]\n");
-        fprintf(stderr, "Available subcommands: clone, commit, help\n");
+        ctx.usage_fn(&ctx);
+        fprintf(stderr, "\n");
+        handle_commit(true, 0, NULL);
+        fprintf(stderr, "\n");
+        handle_clone(true, 0, NULL);
         return 1;
     }
 
     const char *subcmd = res.unparsed_argv[0];
 
     if (strcmp(subcmd, "clone") == 0) {
-        return handle_clone(res.unparsed_argc, res.unparsed_argv);
+        return handle_clone(false, res.unparsed_argc, res.unparsed_argv);
     } else if (strcmp(subcmd, "commit") == 0) {
-        return handle_commit(res.unparsed_argc, res.unparsed_argv);
+        return handle_commit(false, res.unparsed_argc, res.unparsed_argv);
     } else if (strcmp(subcmd, "help") == 0) {
-        printf("Available subcommands: clone, commit, help\n");
+        fprintf(stderr, "Usage: app [--verbose] <subcommand> [options]\n");
+        ctx.usage_fn(&ctx);
+        fprintf(stderr, "\n");
+        handle_commit(true, 0, NULL);
+        fprintf(stderr, "\n");
+        handle_clone(true, 0, NULL);
         return 0;
     } else {
         fprintf(stderr, "Unknown subcommand: %s\n", subcmd);
