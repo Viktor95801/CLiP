@@ -21,6 +21,12 @@ int main(int argc, char **argv) {
         .short_name = 'g',
         .desc = "Whether to say goodbye.",
     });
+    bool *compliment = clip_Ctx_option(&ctx, (clip_Option){
+        .type = vtyp_FLAG,
+        .name = "compliment",
+        .short_name = 'c',
+        .desc = "Whether to compliment the user.",
+    });
     int *age = clip_Ctx_option(&ctx, (clip_Option){
         .type = vtyp_INT,
         .name = "age",
@@ -51,6 +57,10 @@ int main(int argc, char **argv) {
 
     if(*goodbye) {
         printf("Goodbye!\n");
+    }
+
+    if(*compliment) {
+        printf("Nah, you ugly af.\n");
     }
 
     if(*age) {

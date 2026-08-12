@@ -173,6 +173,14 @@ inline clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until) {
         break;                                                                                     \
     }                                                                                              \
 } while(0)
+#define CLIP__findShortOpt(i) do {             \
+    for(int i = 0; i < ctx->_optc; ++i) {      \
+        if(ctx->_optv[i].short_name == *arg) { \
+            opt = &ctx->_optv[i];              \
+            break;                             \
+        }                                      \
+    }                                          \
+} while(0)
 clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
     int i = 0;
     for(char *arg = ctx->_argv[i]; i < ctx->_argc; ++i, arg = ctx->_argv[i]) {
@@ -190,12 +198,7 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
 
         if(*arg != '-') {
             clip_Option *opt = NULL;
-            for(int j = 0; j < ctx->_optc; ++j) {
-                if(ctx->_optv[j].short_name == *arg) {
-                    opt = &ctx->_optv[j];
-                    break;
-                }
-            }
+            CLIP__findShortOpt(j);
             if(opt == NULL) {
                 clip_Result res = {0};
                 snprintf(res.err, CLIP_ERROR_LEN, "unknown short option: %s", ctx->_argv[i]);
@@ -203,12 +206,26 @@ clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]) {
             }
 
             if(opt->type == vtyp_FLAG) {
-                if(strlen(arg) != 1) {
-                    clip_Result res = {0};
-                    snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, ctx->_argv[i]);
-                    return res;
+                while(*arg != 0) {
+                    if(*arg == '=' || *arg == ':') {
+                        clip_Result res = {0};
+                        snprintf(res.err, CLIP_ERROR_LEN, "option '%s' received an unexpected value (flags don't take values): %s", opt->name, ctx->_argv[i]);
+                        return res;
+                    }
+                    CLIP__findShortOpt(k);
+                    if(opt == NULL) {
+                        clip_Result res = {0};
+                        snprintf(res.err, CLIP_ERROR_LEN, "unknown short option: %s", ctx->_argv[i]);
+                        return res;
+                    }
+                    if(opt->type != vtyp_FLAG) {
+                        clip_Result res = {0};
+                        snprintf(res.err, CLIP_ERROR_LEN, "option '%s' is not a flag: %s", opt->name, ctx->_argv[i]);
+                        return res;
+                    }
+                    opt->_handler->as.flag = true;
+                    ++arg;
                 }
-                opt->_handler->as.flag = true;
                 continue;
             }
 
