@@ -65,6 +65,7 @@ typedef struct {
     char **program_argv; // the program's arguments (e.g. files to a compiler in `cc main.c clip.c`). program_argv[0] is the program's name or subcommand.
 } clip_Result;
 
+//TODO: dynamic _optv and stuff instead of fixed-size arrays. maybe pass in an allocator/freer function
 typedef struct clip_Ctx {
     int _argc;
     char **_argv;
@@ -81,7 +82,7 @@ const char *clip__type_hint(clip_Value_Type type);
 void clip__Ctx_print_options(clip_Ctx *ctx);
 void clip_default_Ctx_usage(clip_Ctx *ctx);
 
-bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx));
+void clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx));
 void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt);
 
 // Wraps `clip_parseUntil` with "--" as `until`.
@@ -91,11 +92,7 @@ clip_Result clip_Ctx_parseUntil(clip_Ctx *ctx, const char *until);
 // Stops parsing at the first occurrence of any of the `until` strings.
 clip_Result clip_Ctx_parseUntilMany(clip_Ctx *ctx, int n, const char *until[]);
 
-#ifdef __cplusplus
-}
-#endif
-
-#define CLIP_IMPLEMENTATION
+//#define CLIP_IMPLEMENTATION
 #ifdef CLIP_IMPLEMENTATION
 
 const char *clip__type_hint(clip_Value_Type type) {
@@ -149,7 +146,7 @@ void clip_default_Ctx_usage(clip_Ctx *ctx) {
     clip__Ctx_print_options(ctx);
 }
 
-bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx)) {
+void clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx)) {
     memset(ctx, 0, sizeof(clip_Ctx));
     ctx->_argc = argc;
     ctx->_argv = argv;
@@ -158,7 +155,6 @@ bool clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct
     } else {
         ctx->usage_fn = usage_fn;
     }
-    return true;
 }
 
 void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt) {
@@ -337,6 +333,75 @@ clip_Ctx_parseUntilMany_DONE:
 #undef CLIP__parseArg
 
 #endif // CLIP_IMPLEMENTATION
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+
+class ClipCtx {
+public:
+    ClipCtx(int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx) = nullptr);
+    ~ClipCtx();
+
+    void Init(int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx) = nullptr);
+    template <typename T>
+    T* Option(clip_Option opt);
+    void *OptionRaw(clip_Option opt);
+
+    clip_Result Parse();
+    clip_Result ParseUntil(const char *until);
+    clip_Result ParseUntilMany(int n, const char *until[]);
+
+    clip_Ctx *Raw();
+private:
+    clip_Ctx m_ctx{};
+};
+
+
+//#define CLIP_IMPLEMENTATION
+#ifdef CLIP_IMPLEMENTATION
+
+ClipCtx::ClipCtx(int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx)) {
+    Init(argc, argv, usage_fn);
+}
+
+ClipCtx::~ClipCtx() {
+}
+
+void ClipCtx::Init(int argc, char **argv, void (*usage_fn)(struct clip_Ctx *ctx)) {
+    clip_Ctx_init(&this->m_ctx, argc, argv, usage_fn);
+}
+
+template <typename T>
+T* ClipCtx::Option(clip_Option opt) {
+    return static_cast<T*>(clip_Ctx_option(&this->m_ctx, opt));
+}
+
+void *ClipCtx::OptionRaw(clip_Option opt) {
+    return clip_Ctx_option(&this->m_ctx, opt);
+}
+
+clip_Result ClipCtx::Parse() {
+    return clip_Ctx_parse(&this->m_ctx);
+}
+
+clip_Result ClipCtx::ParseUntil(const char *until) {
+    return clip_Ctx_parseUntil(&this->m_ctx, until);
+}
+
+clip_Result ClipCtx::ParseUntilMany(int n, const char *until[]) {
+    return clip_Ctx_parseUntilMany(&this->m_ctx, n, until);
+}
+
+clip_Ctx *ClipCtx::Raw() {
+    return &this->m_ctx;
+}
+
+#endif // CLIP_IMPLEMENTATION
+
+#endif // __cplusplus
 
 #ifdef CLIP_STRIP_PREFIX
 
