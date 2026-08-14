@@ -81,6 +81,7 @@
 #endif
 
 typedef enum {
+    vtyp_INVALID,
     vtyp_STRING,
     vtyp_INT,
     vtyp_FLOAT,
@@ -153,6 +154,7 @@ const char *clip__type_hint(clip_Value_Type type) {
     case vtyp_FLOAT:  return " <FLOAT>";
     case vtyp_STRING: return " <STR>";
     case vtyp_FLAG:   return "";
+    case vtyp_INVALID: return "";
     }
     return "";
 }
@@ -212,6 +214,7 @@ void clip_Ctx_init(clip_Ctx *ctx, int argc, char **argv, void (*usage_fn)(struct
 void *clip_Ctx_option(clip_Ctx *ctx, clip_Option opt) {
     CLIP_assert(ctx->_optc + 1 <= CLIP_MAX_OPTIONS, "CLIP_MAX_OPTIONS is too small");
     CLIP_assert(opt.name != NULL && strlen(opt.name) > 0, "option name is empty");
+    CLIP_assert(opt.type != vtyp_INVALID, "forgot to set option type");
     ctx->_optv[ctx->_optc] = opt;
     ctx->_values[ctx->_optc] = (clip_Value){
         .type = opt.type,
