@@ -2,7 +2,7 @@
 // I suck at cpp. i tried my best :sob:
 
 #define CLIP_IMPLEMENTATION
-#include "../clip.h"
+#include "../clip.hpp"
 
 int main(int argc, char **argv) {
     ClipCtx ctx(argc, argv);
